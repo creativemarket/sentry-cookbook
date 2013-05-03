@@ -129,8 +129,7 @@ define :sentry_conf,
       package "python-dev" do action :install end
       package "python-psycopg2" do action :install end
       python_pip driver_name do
-        user params[:user]
-        group params[:group]
+        user "root"
         provider Chef::Provider::PythonPip
         virtualenv virtualenv_dir
         action :install
