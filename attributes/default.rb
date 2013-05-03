@@ -12,6 +12,7 @@ default["sentry"]["version"] = "5.4.2"
 default["sentry"]["superuser_creator_script"] = "/tmp/superuser_creator.py"
 
 default["sentry"]["include_settings"] = nil
+default["sentry"]["install_method"] = "package"
 
 default["sentry"]["user"] = "sentry"
 default["sentry"]["group"] = "sentry"
@@ -26,7 +27,6 @@ default["sentry"]["settings"] = {}
 
 default["sentry"]["settings"]["plugins"] = [
                                             "sentry.plugins.sentry_mail",
-                                            "sentry.plugins.sentry_servers",
                                             "sentry.plugins.sentry_urls",
                                             "sentry.plugins.sentry_useragents"]
 
