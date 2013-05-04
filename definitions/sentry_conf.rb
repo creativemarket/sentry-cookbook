@@ -72,30 +72,41 @@ define :sentry_conf,
 
   # Install from source
   if node["sentry"]["install_method"] == 'source'
+    # bin_sentry = "/usr/local/bin/sentry"
 
-    # install dependencies
-    bash "sentry_dependencies" do
-      cwd virtualenv_dir
-      user "root"
-      code <<-EOH
-      source #{virtualenv_dir}/bin/activate &&
-      easy_install -UZ #{virtualenv_dir} > #{virtualenv_dir}/deps.txt
-      EOH
+    if !File.exists? bin_sentry
+
+      # install dependencies
+      bash "sentry_dependencies" do
+        cwd virtualenv_dir
+        user "root"
+        code <<-EOH
+        source #{virtualenv_dir}/bin/activate &&
+        easy_install -UZ #{virtualenv_dir} > #{virtualenv_dir}/deps.txt
+        EOH
+      end
+
+      # make
+      include_recipe "build-essential::default"
+      include_recipe "nodejs::default"
+      include_recipe "nodejs::npm"
+      bash "make_source" do
+        cwd virtualenv_dir
+        user "root"
+        code <<-EOH
+        make
+        EOH
+      end
+
+      bash "mv_bin" do
+        user "root"
+        code <<-EOH
+        mv /usr/local/bin/sentry #{bin_sentry}
+        EOH
+      end
+
     end
 
-    # make
-    include_recipe "build-essential::default"
-    include_recipe "nodejs::default"
-    include_recipe "nodejs::npm"
-    bash "make_source" do
-      cwd virtualenv_dir
-      user "root"
-      code <<-EOH
-      make
-      EOH
-    end
-
-    bin_sentry = "/usr/local/bin/sentry"
   end
 
   # Install sentry from pip package

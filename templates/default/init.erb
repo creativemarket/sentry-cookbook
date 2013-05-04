@@ -1,87 +1,89 @@
 #!/bin/bash
 
-
-
 PROJECT_NAME="<%= @name %>"
-
 PIDFILE="<%= @pidfile %>"
-
+PIDFILE_GUNICORN="<%= @pidfile_gunicorn %>"
 USER_GROUP="<%= @user %>:<%= @group %>"
 
 EXEC="<%= @spawner %>"
 EXEC_ARGS=""
 
 usage(){
-    echo "$0 {start | stop | restart | status}"
+	echo "$0 {start | stop | restart | status}"
 	echo $EXEC
-    exit 1
+	exit 1
 }
-
 
 start(){
-    echo "Starting: $PROJECT_NAME"
-    touch $PIDFILE
-    chown $USER_GROUP $PIDFILE
-    if start-stop-daemon --start --quiet --make-pidfile --umask 007 --pidfile $PIDFILE --chuid $USER_GROUP --exec $EXEC -- $EXEC_ARGS
-    then
-        echo "$PROJECT_NAME started"
-    else
-        echo "Start failed"
-    fi
+	printf "Starting $PROJECT_NAME... "
+
+	touch $PIDFILE
+	chown $USER_GROUP $PIDFILE
+	touch $PIDFILE_GUNICORN
+	chown $USER_GROUP $PIDFILE_GUNICORN
+
+	if start-stop-daemon --start --quiet --background --make-pidfile --umask 007 --pidfile $PIDFILE --chuid root:root --exec $EXEC -- $EXEC_ARGS
+	then
+		sleep 3
+		echo "success"
+	else
+		echo "failed"
+	fi
 }
 
-
 stop(){
-	echo "Stopping: $PROJECT_NAME"
-    if [ -f $PIDFILE ]
-    then
-        echo "$PIDFILE exists, process is already running or crashed"
-		PID=$(cat $PIDFILE)
-		if start-stop-daemon --stop --retry 10 --quiet --oknodo --pidfile $PIDFILE --exec $EXEC
-		then
-			echo "$PROJECT_NAME stoped"
-		else
-			echo "Stop failed"
-		fi
-        while [ -x /proc/${PIDFILE} ]
-        do
-            echo "Waiting for  to shutdown ..."
-            sleep 1
-        done
+	if [ -f "$PIDFILE" ]; then
 
-        kill -9 `ps -eo pid,args | grep "sentry" | cut -c1-6`
-   	rm -f $PIDFILE
-	rm -f $SOCKFILE
-    else
-        echo "$PROJECT_NAME is not running ..."
-    fi
+		# kill main process
+		printf "Stopping $PROJECT_NAME... "
+		if start-stop-daemon --stop --quiet --retry 10 --oknodo --pidfile $PIDFILE
+		then
+			echo "success"
+		else
+			echo "failed"
+		fi
+		while [ -x /proc/${PIDFILE} ]
+		do
+			echo "Waiting for shutdown..."
+			sleep 1
+		done
+		rm -f $PIDFILE
+
+		# kill gunicorn workers
+		if [ -f "$PIDFILE_GUNICORN" ]; then
+			start-stop-daemon --stop --quiet --retry 10 --oknodo --pidfile $PIDFILE_GUNICORN
+			rm -f $PIDFILE_GUNICORN
+		fi
+
+		# force exit of sentry processes
+		rm -f $SOCKFILE
+		PID=`pgrep sentry | egrep -v "$$"`
+		kill -9 $PID 2>/dev/null
+
+	else
+		echo "$PROJECT_NAME is not running"
+	fi
 }
 
 restart(){
-	echo "Restarting: $PROJECT_NAME"
-	${0} stop
-	${0} start
+	echo "Restarting $PROJECT_NAME..."
+	stop
+	start
 }
 
 status(){
-    echo "Status: $PROJECT_NAME"
-    if [ -f $PIDFILE ]
-    then
-        echo "$PIDFILE exists, process is already running or crashed\n"
-    else
-        echo "$PROJECT_NAME is not running ..."
-    fi
+	if [ -f "$PIDFILE" ]
+	then
+		echo "$PROJECT_NAME is running"
+	else
+		echo "$PROJECT_NAME is not running"
+	fi
 }
 
 case $1 in
-    "start") start;;
-
-    "stop") stop;;
-
-    "restart") restart;;
-
-    "status") status;;
-
-    *) usage;;
-
+	"start") start;;
+	"stop") stop;;
+	"restart") restart;;
+	"status") status;;
+	*) usage;;
 esac
